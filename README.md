@@ -11,8 +11,8 @@ Some benchmarks regarding prime numbers.
 
 **How long it takes to compute them?**
 
-| Lang    |  Upper bound |  Time |
----------|-------|--------
+| Lang    |  Upper bound |  Time | Notes
+---------|-------|--------|------
 | Rust    |         2000 |  2.5s |
 | Python3 |         2000 |  1.6s |
 | pypy3   |         2000 |  1.0s |
