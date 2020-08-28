@@ -5,12 +5,14 @@ Some benchmarks regarding prime numbers.
 **How many Mersenne primes are there?**
 
 | Limit  | # MP |
+---------|-------
 |  100   |   3  |
 | 1000   |  13  |
 
 **How long it takes to compute them?**
 
 | Lang    |  Upper bound |  Time |
+---------|-------|--------
 | Rust    |         2000 |  2.5s |
 | Python3 |         2000 |  1.6s |
 | pypy3   |         2000 |  1.0s |
@@ -31,6 +33,7 @@ Approximation:
 Naive computation in rust:
 
 | Limit | #primes | Time |
+---------|-------|--------
 | 10^6  |   78498 | 0.3s |
 | 10^7  |  664579 | 3.0s |
 | 10^8  | 5761455 | 80.s |
