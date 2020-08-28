@@ -1,6 +1,7 @@
 use std::env;
-use rayon::prelude::*;
+// use rayon::prelude::*;
 use rug::Integer;
+use std::time::Instant;
 
 fn generate_primes(limit: u32) -> Vec<u32> {
     let primes = [
@@ -33,11 +34,11 @@ fn generate_primes(limit: u32) -> Vec<u32> {
     }
 
     return vec
-      .iter()
-      .by_ref()
-      .take_while(|&e| e <= &limit)
-      .cloned()
-      .collect();
+        .iter()
+        .by_ref()
+        .take_while(|&e| e <= &limit)
+        .cloned()
+        .collect();
 }
 
 fn prime_seq(mut n: u32, modulus: &Integer) -> Integer {
@@ -52,14 +53,51 @@ fn prime_seq(mut n: u32, modulus: &Integer) -> Integer {
     m
 }
 
-fn check_prime(prime: u32) -> () {
-    let mut m = Integer::from(1) << prime;
-    m -= 1;
-    let s = prime_seq(prime - 1, &m);
-    let is_prime = s % m == 0;
+struct Mersenne {
+    counter: u32,
+    start: std::time::Instant,
+    checked: u32,
+    upper_bound: u32,
+}
 
-    if is_prime {
-        println!("{}", prime);
+impl Mersenne {
+    fn new(upper_bound: u32) -> Self {
+        Mersenne {
+            counter: 1,
+            start: Instant::now(),
+            checked: 1,
+            upper_bound,
+        }
+    }
+
+    fn output(&mut self, prime: u32) {
+        let whitespace = " ".repeat(50);
+        println!(
+            "\r{}\r{:2}:\t{}\t{:.1?}",
+            whitespace,
+            self.counter,
+            prime,
+            self.start.elapsed()
+        );
+        self.counter += 1;
+    }
+
+    fn check_prime(&mut self, prime: u32) {
+        print!(
+            "\rChecking {} | Checked {} primes | Limit: {}",
+            prime, self.checked, self.upper_bound
+        );
+
+        let mut m = Integer::from(1) << prime;
+        m -= 1;
+        let s = prime_seq(prime - 1, &m);
+        let is_prime = s % m == 0;
+
+        if is_prime {
+            self.output(prime);
+        }
+
+        self.checked += 1;
     }
 }
 
@@ -71,8 +109,12 @@ fn main() {
 
     let primes = generate_primes(upper_bound);
 
+    let mut mersenne = Mersenne::new(upper_bound);
+
+    mersenne.output(2);
+
     primes
         // .par_iter()
         .iter()
-        .for_each(|&prime| check_prime(prime));
+        .for_each(|&prime| mersenne.check_prime(prime));
 }
