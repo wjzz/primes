@@ -1,0 +1,64 @@
+wjzz:~/prog/projects/primes/rust-mersenne$ cargo run --release 100000
+    Finished release [optimized] target(s) in 0.01s
+     Running `target/release/rust-mersenne 100000`
+# 1 Got value:      2 after 410.86µs
+# 2 Got value:     17 after 423.50µs
+# 3 Got value:    127 after 437.33µs
+# 4 Got value:      3 after 441.65µs
+# 5 Got value:     19 after 445.81µs
+# 6 Got value:      5 after 449.00µs
+# 7 Got value:      7 after 451.73µs
+# 8 Got value:    107 after 456.53µs
+# 9 Got value:     31 after 460.89µs
+#10 Got value:     13 after 481.59µs
+#11 Got value:     61 after 493.07µs
+#12 Got value:     89 after 507.56µs
+#13 Got value:    521 after 1.75ms
+#14 Got value:    607 after 2.81ms
+#15 Got value:   1279 after 20.44ms
+#16 Got value:   2203 after 111.87ms
+#17 Got value:   2281 after 127.04ms
+#18 Got value:   3217 after 228.28ms
+#19 Got value:   4253 after 993.40ms
+#20 Got value:   4423 after 1.26s
+#21 Got value:   9689 after 19.95s
+#22 Got value:   9941 after 22.00s
+#23 Got value:  11213 after 33.44s
+#24 Got value:  21701 after 223.74s
+#25 Got value:  23209 after 298.92s
+#26 Got value:  19937 after 326.71s
+#27 Got value:  44497 after 5072.57s
+#28 Got value:  86243 after 44766.32s
+===================
+	DONE
+===================
+# 1 	     2
+# 2 	     3
+# 3 	     5
+# 4 	     7
+# 5 	    13
+# 6 	    17
+# 7 	    19
+# 8 	    31
+# 9 	    61
+#10 	    89
+#11 	   107
+#12 	   127
+#13 	   521
+#14 	   607
+#15 	  1279
+#16 	  2203
+#17 	  2281
+#18 	  3217
+#19 	  4253
+#20 	  4423
+#21 	  9689
+#22 	  9941
+#23 	 11213
+#24 	 19937
+#25 	 21701
+#26 	 23209
+#27 	 44497
+#28 	 86243
+
+(around 13-14 hours)

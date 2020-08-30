@@ -1,9 +1,4 @@
 use rug::Integer;
-use std::env;
-use std::time::Instant;
-
-use std::sync::mpsc::{channel, Sender};
-use std::thread;
 
 const SMALL_PRIMES: [u32; 168] = [
     2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71, 73, 79, 83, 89, 97,
@@ -17,7 +12,7 @@ const SMALL_PRIMES: [u32; 168] = [
     937, 941, 947, 953, 967, 971, 977, 983, 991, 997,
 ];
 
-fn generate_primes(limit: u32) -> Vec<u32> {
+pub fn generate_primes(limit: u32) -> Vec<u32> {
     let mut vec: Vec<u32> = SMALL_PRIMES.to_vec();
 
     let mut current = 1001;
@@ -55,7 +50,7 @@ fn prime_seq(mut n: u32, modulus: &Integer) -> Integer {
     m
 }
 
-fn is_mersenne_prime(prime: u32) -> bool {
+pub fn is_mersenne_prime(prime: u32) -> bool {
     let mut m = Integer::from(1) << prime;
     m -= 1;
 
@@ -63,73 +58,4 @@ fn is_mersenne_prime(prime: u32) -> bool {
     let is_prime = s == 0;
 
     is_prime
-}
-
-const N_THREADS: usize = 6;
-
-fn generate_threads(send: Sender<u32>, primes: Vec<u32>) {
-
-    for i in 0..N_THREADS {
-        let sender = send.clone();
-        let primes = primes.clone();
-
-        thread::spawn(move || {
-            let mut k = i;
-            while k < primes.len() {
-                let prime = primes[k];
-                if is_mersenne_prime(prime) {
-                    sender.send(prime).unwrap();
-                }
-                k += N_THREADS;
-            }
-        });
-    }
-}
-
-
-fn initialize_primes() -> Vec<u32> {
-    let args: Vec<String> = env::args().collect();
-
-    let arg = args.get(1).expect("Argument required!");
-    let upper_bound: u32 = arg.parse().unwrap_or(1000);
-
-    generate_primes(upper_bound)
-}
-
-fn main() {
-    let primes = initialize_primes();
-    let (send, recv) = channel();
-
-    let start = Instant::now();
-    let mut count = 1;
-    send.send(2).unwrap();
-
-    generate_threads(send, primes);
-
-    let mut values = vec![];
-
-    // Real time printing
-
-    for value in recv {
-        println!(
-            "#{:2} Got value: {:6} after {:.2?}",
-            count,
-            value,
-            start.elapsed()
-        );
-        count += 1;
-        values.push(value);
-    }
-
-    // Final summary
-
-    values.sort();
-    println!("===================\n\tDONE\n===================");
-    for (i, val) in values.iter().enumerate() {
-        println!(
-            "#{:2} \t{:6}",
-            i+1,
-            val,
-        );
-    }
 }
