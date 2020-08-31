@@ -10,12 +10,12 @@ const SMALL_PRIMES: [u32; 168] = [
     937, 941, 947, 953, 967, 971, 977, 983, 991, 997,
 ];
 
+#[allow(dead_code)]
 pub fn generate_primes(upper_limit: u32) -> Vec<u32> {
     generate_primes_gen(2, upper_limit)
 }
 
 pub fn generate_primes_gen(lower_limit: u32, upper_limit: u32) -> Vec<u32> {
-
     let mut primes: Vec<u32> = vec![];
 
     let mut current = lower_limit;
