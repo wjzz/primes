@@ -8,12 +8,19 @@ use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::sync::{Arc, Mutex};
 
-const OK_FOUND: &'static str = "HTTP/1.1 200 Ok\r\n\r\n";
-const NOT_FOUND: &'static str = "HTTP/1.1 404 Not Found\r\n\r\n";
+use std::fs::File;
+use std::path::Path;
 
+// Local files
+
+mod prime_generator;
 mod primes;
 
-const N_THREADS: usize = 6;
+// Constants
+
+const OK_FOUND: &'static str = "HTTP/1.1 200 Ok\r\n";
+const NOT_FOUND: &'static str = "HTTP/1.1 404 Not Found\r\n\r\n";
+const N_THREADS: usize = 2;
 
 fn spawn_threads(send: Sender<u32>, found_mersennes: &Arc<Mutex<Vec<u32>>>, checked_count: &Arc<Mutex<Vec<u32>>>, primes: Vec<u32>) {
     for i in 0..N_THREADS {
@@ -40,13 +47,30 @@ fn spawn_threads(send: Sender<u32>, found_mersennes: &Arc<Mutex<Vec<u32>>>, chec
     }
 }
 
+fn strip_characters(original : &str, to_strip : &str) -> String {
+    original.chars().filter(|&c| !to_strip.contains(c)).collect()
+}
+
 fn initialize_primes() -> Vec<u32> {
     let args: Vec<String> = env::args().collect();
 
     let arg = args.get(1).expect("Argument required!");
-    let upper_bound: u32 = arg.parse().unwrap_or(1000);
+    let upper_bound: u32 = strip_characters(arg, "_").parse().unwrap_or(1000);
 
-    primes::generate_primes(upper_bound)
+    let v = prime_generator::generate_primes(upper_bound);
+    v
+
+    // TODO: update this
+    // let v = prime_generator::generate_primes(upper_bound);
+
+    // let lower_bound = 100_000_000;
+    // let mut primes = vec![];
+    // for p in v {
+    //     if p >= lower_bound {
+    //         primes.push(p);
+    //     }
+    // }
+    // primes
 }
 
 fn console_reporter(recv: Receiver<u32>) {
@@ -77,10 +101,21 @@ fn console_reporter(recv: Receiver<u32>) {
     }
 }
 
+#[derive(Clone, Copy)]
+struct ServerPayload {
+    prime_count: u32,
+    biggest: u32,
+    start: std::time::Instant,
+}
+
 fn main() {
+    println!("Generating primes...");
     let primes = initialize_primes();
+
+    // primes.reverse();
     let prime_count = primes.len() as u32;
     let biggest = primes[primes.len()-1];
+    println!("Generated {} primes...", prime_count);
 
     let (send, recv) = channel();
 
@@ -89,16 +124,24 @@ fn main() {
 
     send.send(2).unwrap();
 
+    println!("Spawning {} worker threads...", N_THREADS);
+
     spawn_threads(send, &found_mersennes, &checked_count, primes);
+
+    println!("Spawning the console reporter");
 
     let reporter = thread::spawn(move || {
         console_reporter(recv);
     });
 
+    let start = Instant::now();
     let primes_list = Arc::clone(&found_mersennes);
     let checked_count_copy = Arc::clone(&checked_count);
+    let server_payload = ServerPayload { prime_count, biggest, start };
+
+    println!("Spawning the server reporter");
     let server = std::thread::spawn(move || {
-        server_main(primes_list, checked_count_copy, prime_count, biggest).unwrap();
+        server_main(primes_list, checked_count_copy, server_payload).unwrap();
     });
 
     reporter.join().unwrap();
@@ -107,36 +150,53 @@ fn main() {
 
 //============================================================================
 
-fn generate_stats_html(primes: Arc<Mutex<Vec<u32>>>, checked_count: Arc<Mutex<Vec<u32>>>, prime_count: u32, biggest: u32) -> String {
+fn generate_json() -> String {
+    let content_type = "Content-Type: application/json\r\n";
+
+    let json = String::from("[]");
+
+    format!("{}\r\n{}", content_type, json)
+}
+
+fn generate_stats_html(primes: Arc<Mutex<Vec<u32>>>, checked_count: Arc<Mutex<Vec<u32>>>, payload: ServerPayload) -> String {
     let nums = primes.lock().unwrap();
     let num = nums.len();
-    // *num += 1;
+    let ServerPayload { biggest, prime_count, start} = payload;
+
     let mut out = format!(
-        "{}Active threads: {}\nBiggest prime to check: {}\n",
+        "{}\r\nActive threads: {}\nBiggest prime to check: {}\n",
         OK_FOUND, N_THREADS, biggest
     );
 
     out.push_str(&format!("\n"));
 
+    out.push_str(&format!("Total primes to check: {}\n", prime_count));
+
     let counts = checked_count.lock().unwrap();
-    let mut sum = 0;
+    let mut sum = 0u64;
     for n in counts.iter() {
-        sum += n;
+        sum += *n as u64;
     }
+
+    let percentage = 100f64 * (sum as f64) / (prime_count as f64);
+    out.push_str(&format!("{:.2}% done.\n", percentage));
+
     out.push_str(&format!("Total done: {}\n", sum));
 
     for (i, n) in counts.iter().enumerate() {
         out.push_str(&format!(" Thread {} did: {}\n", i+1, n));
     }
 
-    out.push_str(&format!("Total primes to check: {}\n", prime_count));
-
-    let percentage = 100f64 * (sum as f64) / (prime_count as f64);
-    out.push_str(&format!("{:.2}% done.\n", percentage));
-
-
     out.push_str(&format!("\n"));
 
+    let elapsed = start.elapsed();
+    out.push_str(&format!("Time elapsed: {:.2?}\n", elapsed));
+    let elapsed_per_prime =  elapsed.as_millis() as f64 / sum as f64;
+    out.push_str(&format!("Time elapsed per prime: {:.2?}ms\n", elapsed_per_prime));
+    let primes_per_second = sum as f64 / elapsed.as_secs_f64();
+    out.push_str(&format!("Primes per second: {:.2?}\n", primes_per_second));
+
+    out.push_str(&format!("\n"));
 
     out.push_str(&format!("Current count: {}\n", num));
 
@@ -148,7 +208,15 @@ fn generate_stats_html(primes: Arc<Mutex<Vec<u32>>>, checked_count: Arc<Mutex<Ve
     out
 }
 
-fn handle_client(mut stream: TcpStream, primes: Arc<Mutex<Vec<u32>>>, checked_count: Arc<Mutex<Vec<u32>>>, prime_count: u32, biggest: u32) {
+fn serve_www_file(path: &str) -> String {
+    let base = Path::new("./src/www");
+    let mut file = File::open(base.join(path)).unwrap();
+    let mut s = String::new();
+    file.read_to_string(&mut s).unwrap();
+    s
+}
+
+fn handle_client(mut stream: TcpStream, primes: Arc<Mutex<Vec<u32>>>, checked_count: Arc<Mutex<Vec<u32>>>, payload: ServerPayload) {
     println!("==================");
     println!("Connection incoming!");
 
@@ -170,8 +238,10 @@ fn handle_client(mut stream: TcpStream, primes: Arc<Mutex<Vec<u32>>>, checked_co
     println!("PATH: {}", resource);
 
     let response = match resource {
-        "" => format!("{}{}", OK_FOUND, "Hello from Rust!"),
-        "count" => generate_stats_html(primes, checked_count, prime_count, biggest),
+        "" => format!("{}\r\n{}", OK_FOUND, serve_www_file("index.html")),
+        "main.js" => format!("{}\r\n{}", OK_FOUND, serve_www_file("main.js")),
+        "count" => generate_stats_html(primes, checked_count, payload),
+        "json" => format!("{}{}", OK_FOUND, generate_json()),
         _ => NOT_FOUND.to_owned(),
     };
 
@@ -183,7 +253,7 @@ fn handle_client(mut stream: TcpStream, primes: Arc<Mutex<Vec<u32>>>, checked_co
 
 const PORT: u32 = 8080;
 
-fn server_main(found_mersennes: Arc<Mutex<Vec<u32>>>, checked_count: Arc<Mutex<Vec<u32>>>, prime_count: u32, biggest: u32) -> std::io::Result<()> {
+fn server_main(found_mersennes: Arc<Mutex<Vec<u32>>>, checked_count: Arc<Mutex<Vec<u32>>>, payload: ServerPayload) -> std::io::Result<()> {
     println!("Server started");
 
     let ip = format!("0.0.0.0:{}", PORT);
@@ -194,7 +264,7 @@ fn server_main(found_mersennes: Arc<Mutex<Vec<u32>>>, checked_count: Arc<Mutex<V
         let primes = Arc::clone(&found_mersennes);
         let checked_count_copy = Arc::clone(&checked_count);
         thread::spawn(move || {
-            handle_client(stream.unwrap(), primes, checked_count_copy, prime_count, biggest);
+            handle_client(stream.unwrap(), primes, checked_count_copy, payload);
         });
     }
     Ok(())
