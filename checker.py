@@ -27,4 +27,7 @@ if __name__ == "__main__":
         isPrime = s % m == 0
         end = datetime.now()
         if isPrime:
-            print(f"#{i:2}: {p:6} OK {end-start}")
+            line = f"#{i:2}: {p:6} OK {end-start}"
+            print(line)
+            with open("CHECKERS.txt", "+a") as f:
+                print(line, file=f)
